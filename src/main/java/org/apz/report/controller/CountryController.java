@@ -4,15 +4,11 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
-import org.apz.report.model.Country;
 import org.apz.report.service.CountryService;
 import org.apz.report.util.JasperUtils;
+import org.apz.report.util.JasperUtils.TypeReport;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -29,48 +25,35 @@ public class CountryController {
 	@Autowired
     private CountryService countryService;
 	
-	@Value("${tmp.location}")
-	String tmpDir;
-	
 	@RequestMapping
     public ModelAndView country(){
         ModelAndView modelAndView = new ModelAndView();
         modelAndView.addObject("countries", countryService.getCountries());
+        modelAndView.addObject("reports", JasperUtils.TypeReport.values());
         modelAndView.setViewName("country");
         return modelAndView;
     }
 	
 	@RequestMapping("/export/{type}")
-    public ResponseEntity<Resource> export(@PathVariable("type") String type) throws Exception{
+    public ResponseEntity<Resource> export(@PathVariable("type") TypeReport type) throws Exception{
 		
-		String jasper = CountryController.class.getResource("/jasper/countries.jasper").getFile();
+		File report = countryService.getReport(type);
 		
-		String salida = tmpDir + "countries." + type;
 		
-        List<Country> country = countryService.getCountries();
-        Map<String, Object> parameters = new HashMap<>();
-	    parameters.put("TITULO", "PAISES");
-	    parameters.put("FECHA", new java.util.Date());
-        JasperUtils.listReport(jasper, country, type, parameters, salida);
-        
-        File file = new File(salida);
-        Path path = Paths.get(file.getAbsolutePath());
+        Path path = Paths.get(report.getAbsolutePath());
         ByteArrayResource resource = new ByteArrayResource(Files.readAllBytes(path));
         
         HttpHeaders headers = new HttpHeaders();
-        headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=countries." + type);
+        headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + report.getName());
         headers.add("Cache-Control", "no-cache, no-store, must-revalidate");
         headers.add("Pragma", "no-cache");
         headers.add("Expires", "0");
         
         return ResponseEntity.ok()
 	            .headers(headers)
-	            .contentLength(file.length())
-	            .contentType(MediaType.parseMediaType("application/octet-stream"))
+	            .contentLength(report.length())
+	            .contentType(MediaType.parseMediaType(type.getMimeType()))
 	            .body(resource);
     }
-	
-	
-	
-	
+		
 }

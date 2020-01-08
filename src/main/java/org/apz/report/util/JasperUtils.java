@@ -19,11 +19,13 @@ import net.sf.jasperreports.engine.JasperFillManager;
 import net.sf.jasperreports.engine.JasperPrint;
 import net.sf.jasperreports.engine.JasperReport;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import net.sf.jasperreports.engine.export.JRRtfExporter;
 import net.sf.jasperreports.engine.export.ooxml.JRDocxExporter;
 import net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter;
 import net.sf.jasperreports.engine.util.JRLoader;
 import net.sf.jasperreports.export.SimpleExporterInput;
 import net.sf.jasperreports.export.SimpleOutputStreamExporterOutput;
+import net.sf.jasperreports.export.SimpleWriterExporterOutput;
 import net.sf.jasperreports.export.SimpleXlsxReportConfiguration;
 
 public class JasperUtils {
@@ -33,6 +35,33 @@ public class JasperUtils {
 	
 	private static Logger logger = LogManager.getLogger(JasperUtils.class);
 	
+	public enum TypeReport {
+		PDF("pdf", "application/pdf"),
+		XML("xml", "application/xml"),
+		XLS("xls", "application/vnd.ms-excel"),
+		RTF("rtf", "application/rtf"),
+		DOC("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+		HTML("html", "text/html");
+		
+		private String ext;
+		private String mimeType;
+		
+		TypeReport(String ext, String mimeType) {
+			this.ext = ext;
+			this.mimeType = mimeType;
+		}
+
+		public String getExt() {
+			return ext;
+		}
+		public String getMimeType() {
+			return mimeType;
+		}
+		public static TypeReport get(String ext) throws Exception {
+			return Arrays.asList(TypeReport.values()).stream()
+					.filter(tr->tr.getExt().equals(ext)).findFirst().orElseThrow(()-> new Exception("Formato no correcto"));
+		}
+	}
 	/**
 	 * Metodo que genera el un report con el jasper compilado (por cuestiones de performance)
 	 * 
@@ -41,21 +70,15 @@ public class JasperUtils {
 	 * @param nombrePdfSalida nombre que va tener el pdf generado
 	 * @throws JRException si habido un error
 	 */	
-	public static void staticReport(String nombreJasperCompilado, String typeFile, Map<String, Object> parameters, String nombrePdfSalida) throws Exception {
+	public static void staticReport(String jasper, TypeReport typeReport, Map<String, Object> parameters, String output) throws Exception {
 		
 		try {
 			
-			//InputStream reportStream = JasperUtils.class.getResourceAsStream(nombreJasperCompilado);
-
-			File sourcePath = new File("C:\\desarrollo\\wk-mediasearch\\ms-admin\\src\\main\\resources\\reports\\" + nombreJasperCompilado +".jasper");
-			String salida = "C:\\tmp\\"+nombrePdfSalida+"."+typeFile;
-			logger.info(sourcePath);
-			
-			JasperReport jr = (JasperReport) JRLoader.loadObject(new FileInputStream(sourcePath));
+			JasperReport jr = (JasperReport) JRLoader.loadObject(new FileInputStream(output));
 
 			JasperPrint jasperPrint = JasperFillManager.fillReport(jr, parameters);
 
-			exportReport(jasperPrint, typeFile, salida);
+			exportReport(jasperPrint, typeReport, output);
 			
 			logger.info("OK");
 			
@@ -75,19 +98,19 @@ public class JasperUtils {
 	 * @param nombrePdfSalida nombre que va tener el pdf generado
 	 * @throws JRException si habido un error
 	 */
-	public static void listReport(String nombreJasperCompilado, List<?> list, String typeFile,
-			                             Map<String, Object> parameters, String salida) throws Exception {
+	public static void listReport(String jasper, List<?> list, TypeReport typeReport,
+			                             Map<String, Object> parameters, String output) throws Exception {
 			
 		try {
 			
 			JRDataSource jRDataSource = new JRBeanCollectionDataSource(list, false);
 		
 			//InputStream reportStream = JasperUtils.class.getResourceAsStream(nombreJasperCompilado);
-			JasperReport jr = (JasperReport) JRLoader.loadObject(new FileInputStream(nombreJasperCompilado));
+			JasperReport jr = (JasperReport) JRLoader.loadObject(new FileInputStream(jasper));
 			
 			JasperPrint jasperPrint = JasperFillManager.fillReport(jr, parameters, jRDataSource);
 			
-			exportReport(jasperPrint, typeFile, salida);
+			exportReport(jasperPrint, typeReport, output);
 			
 		} catch (JRException e) {
 			logger.error(e.getMessage());
@@ -95,14 +118,14 @@ public class JasperUtils {
 		}
 	}
 	
-	public static void listReportJdbc(Connection conn, String jasper, String typeFile, 
-			Map<String, Object> parameters, String salida) throws Exception {
+	public static void listReportJdbc(Connection conn, String jasper, TypeReport typeReport, 
+			Map<String, Object> parameters, String output) throws Exception {
 		  
 		try {
 			
 		  JasperPrint jasperPrint = JasperFillManager.fillReport(jasper, parameters, conn);
 	      
-		  exportReport(jasperPrint, typeFile, salida);
+		  exportReport(jasperPrint, typeReport, output);
 		  
 		} catch (JRException e) {
 			logger.error(e.getMessage());
@@ -112,39 +135,45 @@ public class JasperUtils {
 	}
 	
 	
-	private static void exportReport(JasperPrint jasperPrint, String typeFile, String salida) throws JRException {
-		logger.info("generando : " + salida);
-		switch (typeFile) {
-			case "pdf":
-				JasperExportManager.exportReportToPdfFile(jasperPrint, salida);
+	private static void exportReport(JasperPrint jasperPrint, TypeReport typeReport, String output) throws JRException {
+		logger.info("generando : " + output);
+		switch (typeReport) {
+			case PDF:
+				JasperExportManager.exportReportToPdfFile(jasperPrint, output);
 				break;
-			case "xml":
-				JasperExportManager.exportReportToXmlFile(jasperPrint, salida, false);
+			case XML:
+				JasperExportManager.exportReportToXmlFile(jasperPrint, output, false);
 				break;
-			case "xls":
+			case XLS:
 				JRXlsxExporter exporter = new JRXlsxExporter();
 			    exporter.setExporterInput(new SimpleExporterInput(jasperPrint));
-			    exporter.setExporterOutput(new SimpleOutputStreamExporterOutput(salida));
+			    exporter.setExporterOutput(new SimpleOutputStreamExporterOutput(output));
 			    SimpleXlsxReportConfiguration configuration = new SimpleXlsxReportConfiguration();
-			    configuration.setOnePagePerSheet(true);
+			    configuration.setOnePagePerSheet(false);
 			    configuration.setDetectCellType(true);
 			    exporter.setConfiguration(configuration);
 			    exporter.exportReport();
 				break;
-			case "doc":
+			case RTF:
+				JRRtfExporter rtfExporter = new JRRtfExporter();
+				rtfExporter.setExporterInput(new SimpleExporterInput(jasperPrint));
+				rtfExporter.setExporterOutput(new SimpleWriterExporterOutput(new File(output)));
+				rtfExporter.exportReport();
+				break;	
+			case DOC:
 				JRDocxExporter docExporter = new JRDocxExporter();
 				docExporter.setExporterInput(new SimpleExporterInput(jasperPrint));      
-			    docExporter.setExporterOutput(new SimpleOutputStreamExporterOutput(salida));
+			    docExporter.setExporterOutput(new SimpleOutputStreamExporterOutput(output));
 			    docExporter.exportReport();
 			 	break;
-			case "html":
-				JasperExportManager.exportReportToHtmlFile(jasperPrint, salida);
+			case HTML:
+				JasperExportManager.exportReportToHtmlFile(jasperPrint, output);
 				break;	
 			default:
-				logger.warn(typeFile + " no es un formato valido");
+				logger.warn(typeReport.getExt() + " no es un formato valido");
 				break;
 		}
-		logger.info("generando : OK");
+		logger.info("generando : "+ output);
 	}
 	
 	public static void compileReportToJasperFile(String sourcePath, String compiledPath) throws Exception {
@@ -176,4 +205,6 @@ public class JasperUtils {
 		
 		
 	}
+	
+	
 }

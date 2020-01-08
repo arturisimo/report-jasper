@@ -26,10 +26,9 @@
 					<h1>Países</h1>
 				</div>	
 				<div class="pull-right" style="padding-top:20px;">
-			    	 <a class="btn btn-danger" href="/export/pdf">pdf</a>  <a class="btn btn-danger" href="/export/xml">xml</a>  
-			    	 <a class="btn btn-danger" href="/export/html">html</a> <a class="btn btn-danger" href="/export/xls">xls</a>
-			    	 <a class="btn btn-danger" href="/export/doc">doc</a>
-			    </div>
+					<a class="btn btn-danger" th:each="report : ${reports}"  th:href="@{export/{r}(r=${report})}" th:text="${report.ext}" >...</a>
+				</div>
+			    
 			</div>
 			<div class="row" style="padding:0px 20px;">
 				<table id="myTable" class="table table-hover">
